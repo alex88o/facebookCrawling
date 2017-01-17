@@ -1,0 +1,5 @@
+\\http://yoda.dmi.unict.it/sentiment/callback.php
+<?php
+echo htmlspecialchars($_GET["name"]);
+?>
+

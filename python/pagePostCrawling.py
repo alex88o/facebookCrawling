@@ -11,7 +11,7 @@ import pprint
 
 
 global_buffer = []
-
+import json
 def rinnovaToken(old_token):
 	
 	"""
@@ -38,7 +38,25 @@ def rinnovaToken(old_token):
 	print resp
 
 def processComments(comments):
-	return 100
+#	print "\n\n"
+	#print comments
+	data = comments['data']
+	for idx, user in enumerate(data):
+		print str(idx+1)+")\t"+user['from']['name']
+#	sys.exit(0)
+	count = len(comments['data'])
+
+	if 'next' in comments['paging']:
+		url = comments['paging']['next']
+#	if len(url)>0:	
+		resp = urllib.urlopen(url).read()
+		resp = json.loads(resp)
+		print "\n new recursion"
+		count = count + processComments(resp)
+
+	print "counted:\t" + str(count)		
+	return count
+	sys.exit(0)
 
 def processReactions(reactions):
 	return 50
@@ -66,11 +84,11 @@ def processResponse(pageId,res,n):
 		if post['type'] == 'photo':
 			created_time	=	post['created_time']
 			id		=	post['id']
-			#message		=	post['message']
+			message		=	post['message']
 			post_permalink	=	post['permalink_url']
 			
 			pic_url		=	post['full_picture']
-			
+			print message
 			comments_count	=	processComments(post['comments'])
 			reactions_count	=	processReactions(post['reactions']) 
 
@@ -98,9 +116,9 @@ def getPagePosts(pageID,n):
 	host = "https://graph.facebook.com/v2.8/"
 	post_limit = None
 	if post_limit:
-		path = pageID + "?fields=posts.limit("+str(post_limit)+"){id,full_picture,type,comments,reactions,permalink_url,created_time}"
+		path = pageID + "?fields=posts.limit("+str(post_limit)+"){id,full_picture,type,comments,reactions,permalink_url,created_time,message}"
 	else:
-		path = pageID + "?fields=posts{id,full_picture,type,comments,reactions,permalink_url,created_time}"	#{message,full_picture,comments,reactions,permalink_url}"
+		path = pageID + "?fields=posts{id,full_picture,type,comments,reactions,permalink_url,created_time,message}"	#{message,full_picture,comments,reactions,permalink_url}"
 
 	params = urllib.urlencode({"access_token": ACCESS_TOKEN})
 
@@ -127,7 +145,7 @@ ACCESS_TOKEN = os.environ['FB_ACCESS_TOKEN']
 # build the URL for the API endpoint
 pageID = "EsteeLauderUK"
 
-n = 10 #tries to crawl 10 posts with pictures
+n = 1 #tries to crawl n posts with pictures
 
 #rinnovaToken(ACCESS_TOKEN)
 #sys.exit(0)

@@ -41,9 +41,8 @@ def processComments(comments):
 #	print "\n\n"
 	#print comments
 	data = comments['data']
-	for idx, user in enumerate(data):
-		print str(idx+1)+")\t"+user['from']['name']
-#	sys.exit(0)
+	#for idx, user in enumerate(data):
+		#print str(idx+1)+")\t"+user['from']['name']
 	count = len(comments['data'])
 
 	if 'next' in comments['paging']:
@@ -59,10 +58,17 @@ def processComments(comments):
 #	sys.exit(0)
 
 def processReactions(reactions):
-	return 50
+	data = reactions['data']
+	count = len(reactions['data'])
+	if 'next' in reactions['paging']:
+		url = reactions['paging']['next']
+		resp = urllib.urlopen(url).read()
+		resp = json.loads(resp)
+		count = count + processReactions(resp)
+	return count
 
 
-def processResponse(pageId,res,n):
+def processResponse(pageId,res,n,name=None):
 #TODO:	per ogni elemento restituito (post):
 #	- controlla che sia di tipo photo
 #	- salva i dati in json/pickle e scarica la foto
@@ -78,29 +84,64 @@ def processResponse(pageId,res,n):
 		    u'paging': {u'next':
 				u'previous':}}}
 	"""
-	data = res['posts']['data']
+	try:
+		if not name:
+			name = res['name']
+	except:
+		print "ERROR"
+		pprint.pprint(res)
+		sys.exit(0)
 
+	if not 'posts' in res:
+		print "Access not allowed!\tuser:\t"+name
+#		pprint.pprint(res)
+		return -1
+
+	data = res['posts']['data']
+	print "\nAnalysing results for the profile:\t" + name
 	for post in data:
 		if post['type'] == 'photo':
 			created_time	=	post['created_time']
 			id		=	post['id']
-			message		=	post['message']
+			if 'message' in post:
+				message		=	post['message']
+			else:
+				message = ''
 			post_permalink	=	post['permalink_url']
 			
 			pic_url		=	post['full_picture']
-			print message
-			comments_count	=	processComments(post['comments'])
-			reactions_count	=	processReactions(post['reactions']) 
+			if 'comments' in post:
+				comments_count	=	processComments(post['comments'])
+			else:
+				comments_count = 0	
+			if 'reactions' in post:
+				reactions_count	=	processReactions(post['reactions']) 
+			else:
+				reactions_count = 0	
+#			print "\n"
+#			print message
+#			print "Tot. comments:\t" + str(comments_count)
+#			print "Tot. reactions:\t" + str(reactions_count)
 
 			
 			global_buffer.append(post)
-			print "\nAdding post to the global buffer (size\t"+str(len(global_buffer))+")"		
+#			print "Adding post to the global buffer (size\t"+str(len(global_buffer))+")"		
 			
 			directory = post['id']
 			if not os.path.exists(pageId+"/"+directory):
 			    os.makedirs(pageId+"/"+directory)
 
-			print "\nDownloading post picture"		
+			print "Saving post information..."
+			obj ={'postId':{},'postMessage':{}, 'postURL':{},'postComments':{}, 'postReactions':{}}
+			obj['postId'] = id
+			obj['postMessage'] = message
+			obj['postURL'] = post_permalink
+			obj['postComments'] = comments_count
+			obj['postReactions'] = reactions_count
+			ff = open(pageId+"/"+directory+"/"+str(id)+".json",'w')
+			ff.write(json.dumps(obj))
+			ff.close()
+			print "Downloading post picture..."		
 			urllib.urlretrieve(pic_url, pageId+"/"+directory+"/post_picture")
 
 	
@@ -109,16 +150,21 @@ def processResponse(pageId,res,n):
 		if len(global_buffer) == n:
 			return
 
-	next_url = res['posts']['paging']['next']
+	if 'paging' in res['posts']:
+		next_url = res['posts']['paging']['next']
+		resp = urllib.urlopen(next_url).read()
+		resp = json.loads(resp)
+		processResponse(pageId,res,n,name)
 
-def getPagePosts(pageID,n):
+
+def getPagePosts(pageID,n=None):
 
 	host = "https://graph.facebook.com/v2.8/"
-	post_limit = None
+	post_limit = None # the limit is granted by the checking on the global_buffer size
 	if post_limit:
-		path = pageID + "?fields=posts.limit("+str(post_limit)+"){id,full_picture,type,comments,reactions,permalink_url,created_time,message}"
+		path = pageID + "?fields=name,posts.limit("+str(post_limit)+"){id,full_picture,type,comments,reactions,permalink_url,created_time,message}"
 	else:
-		path = pageID + "?fields=posts{id,full_picture,type,comments,reactions,permalink_url,created_time,message}"	#{message,full_picture,comments,reactions,permalink_url}"
+		path = pageID + "?fields=name,posts{id,full_picture,type,comments,reactions,permalink_url,created_time,message}"	#{message,full_picture,comments,reactions,permalink_url}"
 
 	params = urllib.urlencode({"access_token": ACCESS_TOKEN})
 
@@ -135,7 +181,8 @@ def getPagePosts(pageID,n):
 	
 	#display the result
 #	pprint.pprint(respObj)
-	posts = processResponse(pageID,respObj,n)
+	processResponse(pageID,respObj,n)
+	return respObj['name']
 
 
 # get Facebook access token from environment variable
@@ -147,10 +194,26 @@ pageID = "runfederun" #federica fontana "741742414" #Alessandra Airo'      #"Est
 
 n = 10 #tries to crawl n posts with pictures
 
+f = open('IDs.txt')
+id_list = f.read()
+f.close()
+id_list = id_list.split('\n')
+#id_list = ['EsteeLauderUK']
+for id in id_list:
+	global_buffer = []
+	if len(id)>0:
+		#print "ID:\t" + id
+		
+		pageID = id
+		r = getPagePosts(pageID,n)
+		if r==-1: #access not allowed
+			continue;
+		print "Processed\t"+str(len(global_buffer))+ "\tposts for the user\t"+r
+#	sys.exit(0)
+
 #rinnovaToken(ACCESS_TOKEN)
 #sys.exit(0)
 
-getPagePosts(pageID,n)
 
 
 

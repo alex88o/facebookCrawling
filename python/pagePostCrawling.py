@@ -13,7 +13,7 @@ import pprint
 global_buffer = []
 import json
 def rinnovaToken(old_token):
-	
+	# TOFIX: QUESTO METODO NON FUNZIONA	
 	"""
 		PER OTTENERE UN TOKEN DI 60 GIORNI SEGUIRE QUESTA GUIDA   https://www.slickremix.com/facebook-60-day-user-access-token-generator
 	"""
@@ -51,12 +51,12 @@ def processComments(comments):
 #	if len(url)>0:	
 		resp = urllib.urlopen(url).read()
 		resp = json.loads(resp)
-		print "\n new recursion"
+#		print "\n new recursion"
 		count = count + processComments(resp)
 
-	print "counted:\t" + str(count)		
+#	print "Counted comments:\t" + str(count)		
 	return count
-	sys.exit(0)
+#	sys.exit(0)
 
 def processReactions(reactions):
 	return 50
@@ -133,19 +133,19 @@ def getPagePosts(pageID,n):
 	# convert the returned JSON string to a Python datatype 
 	respObj = json.loads(resp)
 	
-	posts = processResponse(pageID,respObj,n)
-
-	# display the result
+	#display the result
 #	pprint.pprint(respObj)
+	posts = processResponse(pageID,respObj,n)
 
 
 # get Facebook access token from environment variable
-ACCESS_TOKEN = os.environ['FB_ACCESS_TOKEN']
+#ACCESS_TOKEN = os.environ['FB_ACCESS_TOKEN']
+ACCESS_TOKEN = '1848071075471222|tY-TDMNfqEu5MZC54f22o5siRHM'
 
 # build the URL for the API endpoint
-pageID = "EsteeLauderUK"
+pageID = "runfederun" #federica fontana "741742414" #Alessandra Airo'      #"EsteeLauderUK"
 
-n = 1 #tries to crawl n posts with pictures
+n = 10 #tries to crawl n posts with pictures
 
 #rinnovaToken(ACCESS_TOKEN)
 #sys.exit(0)

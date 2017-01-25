@@ -79,7 +79,7 @@ def processReactions(reactions):
 def processResponse(pageId,res):
 
 	posts_ls = res['data']
-	for p_idx, post enumerate(posts_ls):
+	for p_idx, post in enumerate(posts_ls):
 
 		created_time	=	post['created_time']
 		id		=	post['id']
@@ -92,12 +92,12 @@ def processResponse(pageId,res):
 			pic_url			=	post['picture']
 
 		if 'comments' in post:
-		print "Comments processing"
+			print "Comments processing"
 			all_comments	=	processComments(post['comments'])
 			post['comments'] = all_comments
 	
 		if 'reactions' in post:
-		print "Reactions processing"
+			print "Reactions processing"
 			all_reactions	=	processReactions(post['reactions']) 
 			post['reactions'] = all_reactions
 
@@ -108,20 +108,22 @@ def processResponse(pageId,res):
 			os.makedirs(pageId+"/"+directory)
 		print "Downloading post pictures..."		
 		
-		if not full_pic_url == ''
+		if not full_pic_url == '':
 			urllib.urlretrieve(full_pic_url, pageId+"/"+directory+"/"+str(post['id']))
-		if not pic_url == ''
+		if not pic_url == '':
 			urllib.urlretrieve(pic_url, pageId+"/"+directory+"/thumb_"+str(post['id']))
 
 		global_buffer.append(post)
+		global tot_posts
 		tot_posts += 1
-		if len(global_buffer)==buffer_limit or len(posts_ls) - (p_idx+1) < buffer_limit
+		print "Total posts processed:\t"+str(tot_posts)
+		if len(global_buffer)==buffer_limit or len(posts_ls) - (p_idx+1) < buffer_limit:
 			print "Saving posts information..."
 
-			insertResult = db.oldPosts.insertMany(global_buffer)
+			insertResult = db.oldPosts.insert_many(global_buffer)
 			
-			print "\nInsert result:"
-			pprint.pprint(insertResult)
+			print "\nInsert result:"+str(len(insertResult))
+			global global_buffer
 			global_buffer = []
 			print "waiting "+str(1)+" secs..."
 			time.sleep(1)
@@ -142,7 +144,8 @@ def getPagePosts(pageID):
 
 	host = "https://graph.facebook.com/v2.8/"
 	path = pageID + "/posts?fields=id,full_picture,picture,type,permalink_url,message,created_time,caption,description,updated_time,targeting,feed_targeting,comments{from,comment_count,id,message,created_time,like_count,user_likes},reactions{type,name,id}&since=" + str(since) +	"&until=" + str(until)
-
+	pprint.pprint(path)
+	return 0
 	params = urllib.urlencode({"access_token": ACCESS_TOKEN})
 
 	url = "{host}{path}&{params}".format(host=host, path=path, params=params)
@@ -190,12 +193,15 @@ if len(sys.argv)<2:
 	sys.exit(ERR_INPUT)
 
 pageID =sys.argv[1]
-pageID = 'EsteeLauderUK'
+#pageID = 'EsteeLauderUK'
 print "\n" + datetime.datetime.now().strftime(date_format)
 print "Behaviour Analysis:\t starting crawling from page ID\t-\t" + str(pageID)
 
+global tot_posts
 tot_posts = 0
+global buffer_limit 
 buffer_limit = 10 #number of posts to collect before writing the DB
+global global_buffer
 global_buffer = []
 
 

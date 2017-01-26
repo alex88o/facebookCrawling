@@ -56,39 +56,49 @@ def processComments(comments):
 	data = comments['data']
 	count = len(comments['data'])
 
-	if 'next' in comments['paging']:
-		url = comments['paging']['next']
-		resp = urllib.urlopen(url).read()
-		resp = json.loads(resp)
-		data = data + processComments(resp)
+	if 'paging' in comments:
+		if 'next' in comments['paging']:
+			url = comments['paging']['next']
+			resp = urllib.urlopen(url).read()
+			resp = json.loads(resp)
+			data = data + processComments(resp)
 
 	return data
 
 def processReactions(reactions):
 	data = reactions['data']
 
-	if 'next' in reactions['paging']:
-		url = reactions['paging']['next']
-		resp = urllib.urlopen(url).read()
-		resp = json.loads(resp)
-		data = data + processReactions(resp)
+	if 'paging' in reactions:
+		if 'next' in reactions['paging']:
+			url = reactions['paging']['next']
+			resp = urllib.urlopen(url).read()
+			resp = json.loads(resp)
+			data = data + processReactions(resp)
 
 	return data
 
 
 def processResponse(pageId,res):
 
-	posts_ls = res['data']
+	try:
+		posts_ls = res['data']
+	except:
+		print "\n\nres content:"
+		pprint.pprint(res)
+		print "\n\n"
+		sys.exit(-1)
+		
+	print "Posts in this bunch:\t" +str(len(posts_ls))
 	for p_idx, post in enumerate(posts_ls):
 
 		created_time	=	post['created_time']
 		id		=	post['id']
 			
 		full_pic_url = ''
-		if post['full_picture']:
+		if 'full_picture' in post:
 			full_pic_url		=	post['full_picture']
 		pic_url = ''
-		if post['picture']:
+		if 'picture' in post:
 			pic_url			=	post['picture']
 
 		if 'comments' in post:
@@ -102,7 +112,6 @@ def processResponse(pageId,res):
 			post['reactions'] = all_reactions
 
 		directory = post['id']	
-#			print "Adding post to the global buffer (size\t"+str(len(global_buffer))+")"		
 			
 		if not os.path.exists(pageId+"/"+directory):
 			os.makedirs(pageId+"/"+directory)
@@ -113,16 +122,18 @@ def processResponse(pageId,res):
 		if not pic_url == '':
 			urllib.urlretrieve(pic_url, pageId+"/"+directory+"/thumb_"+str(post['id']))
 
+		print "Adding post to the global buffer (size\t"+str(len(global_buffer))+")"		
 		global_buffer.append(post)
 		global tot_posts
 		tot_posts += 1
 		print "Total posts processed:\t"+str(tot_posts)
-		if len(global_buffer)==buffer_limit or len(posts_ls) - (p_idx+1) < buffer_limit:
+		if len(global_buffer)==buffer_limit:
 			print "Saving posts information..."
 
 			insertResult = db.oldPosts.insert_many(global_buffer)
 			
-			print "\nInsert result:"+str(len(insertResult))
+			print "\nInsert result:"
+			pprint.pprint(insertResult)
 			global global_buffer
 			global_buffer = []
 			print "waiting "+str(1)+" secs..."
@@ -132,20 +143,30 @@ def processResponse(pageId,res):
 	
 
 	
-	if 'paging' in res:
-		if 'next' in res['paging']:
+	if 'paging' in res and 'next' in res['paging']:
 			next_url = res['paging']['next']
 			resp = urllib.urlopen(next_url).read()
 			resp = json.loads(resp)
 			processResponse(pageId,resp)
+	else:
+			print "Saving posts information..."
+			insertResult = db.oldPosts.insert_many(global_buffer)
+			print "\nInsert result:"
+			pprint.pprint(insertResult)
+			global global_buffer
+			global_buffer = []
+			print "waiting "+str(1)+" secs..."
+			time.sleep(1)
+			print "\n"
+	
+
 
 
 def getPagePosts(pageID):
 
 	host = "https://graph.facebook.com/v2.8/"
 	path = pageID + "/posts?fields=id,full_picture,picture,type,permalink_url,message,created_time,caption,description,updated_time,targeting,feed_targeting,comments{from,comment_count,id,message,created_time,like_count,user_likes},reactions{type,name,id}&since=" + str(since) +	"&until=" + str(until)
-	pprint.pprint(path)
-	return 0
+
 	params = urllib.urlencode({"access_token": ACCESS_TOKEN})
 
 	url = "{host}{path}&{params}".format(host=host, path=path, params=params)

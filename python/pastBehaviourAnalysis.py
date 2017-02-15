@@ -22,7 +22,8 @@ import json
 
 date_format = '%Y-%m-%d %H:%M:%S'
 client = MongoClient('localhost', 27017)
-db = client.pastBehaviour
+#db = client.pastBehaviour
+db = client.pastEngagement
 
 def rinnovaToken(old_token):
 	# TOFIX: QUESTO METODO NON FUNZIONA	
@@ -79,6 +80,7 @@ def processReactions(reactions):
 
 
 def processResponse(pageId,res):
+	global global_buffer
 
 	try:
 		posts_ls = res['data']
@@ -90,7 +92,7 @@ def processResponse(pageId,res):
 		
 	print "Posts in this bunch:\t" +str(len(posts_ls))
 	for p_idx, post in enumerate(posts_ls):
-
+	
 		created_time	=	post['created_time']
 		id		=	post['id']
 			
@@ -134,7 +136,6 @@ def processResponse(pageId,res):
 			
 			print "\nInsert result:"
 			pprint.pprint(insertResult)
-			global global_buffer
 			global_buffer = []
 			print "waiting "+str(1)+" secs..."
 			time.sleep(1)
@@ -144,32 +145,41 @@ def processResponse(pageId,res):
 
 	
 	if 'paging' in res and 'next' in res['paging']:
-			next_url = res['paging']['next']
-			resp = urllib.urlopen(next_url).read()
-			resp = json.loads(resp)
-			processResponse(pageId,resp)
-	else:
-			print "Saving posts information..."
-			insertResult = db.oldPosts.insert_many(global_buffer)
-			print "\nInsert result:"
-			pprint.pprint(insertResult)
-			global global_buffer
-			global_buffer = []
-			print "waiting "+str(1)+" secs..."
-			time.sleep(1)
-			print "\n"
+		next_url = res['paging']['next']
+		resp = urllib.urlopen(next_url).read()
+		resp = json.loads(resp)
+		processResponse(pageId,resp)
+	elif len(global_buffer)>0:
+		print "Saving posts information..."
+		insertResult = db.oldPosts.insert_many(global_buffer)
+		print "\nInsert result:"
+		pprint.pprint(insertResult)
+		global_buffer = []
+		print "waiting "+str(1)+" secs..."
+		time.sleep(1)
+		print "\n"
 	
 
 
 
-def getPagePosts(pageID):
+def getPagePosts(ID):
+
+	ID = str(ID)
 
 	host = "https://graph.facebook.com/v2.8/"
-	path = pageID + "/posts?fields=id,full_picture,picture,type,permalink_url,message,created_time,caption,description,updated_time,targeting,feed_targeting,comments{from,comment_count,id,message,created_time,like_count,user_likes},reactions{type,name,id}&since=" + str(since) +	"&until=" + str(until)
+	path = ID + "/posts?fields=id,full_picture,picture,type,permalink_url,message,created_time,caption,description,updated_time,targeting,feed_targeting,comments{from,comment_count,id,message,created_time,like_count,user_likes},reactions{type,name,id}&since=" + str(since) +	"&until=" + str(until)
 
+	#print "Path:"
+	#print path
+	#print "\n"
 	params = urllib.urlencode({"access_token": ACCESS_TOKEN})
 
 	url = "{host}{path}&{params}".format(host=host, path=path, params=params)
+#	print "\n\n\t"+path
+#	foo = ID + "hello"
+#	print foo
+#	print ID+"hello"
+#	sys.exit(0)
 
 	# open the URL and read the response
 	tryflag = True
@@ -197,7 +207,7 @@ def getPagePosts(pageID):
 	respObj = json.loads(resp)
 #	respObj = respObj['data']	# keep the response data (list of posts)
 
-	processResponse(pageID,respObj)
+	processResponse(ID,respObj)
 
 	id = respObj['data'][0]['id'].split('_')[0]
 	return id

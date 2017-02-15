@@ -55,6 +55,10 @@ def rinnovaToken(old_token):
 
 def processComments(comments):
 
+	data = []
+	if not'data' in comments:
+		return data
+		
 	data = comments['data']
 	count = len(comments['data'])
 
@@ -68,6 +72,11 @@ def processComments(comments):
 	return data
 
 def processReactions(reactions):
+
+	data = []
+	if not'data' in reactions:
+		return data
+
 	data = reactions['data']
 
 	if 'paging' in reactions:
@@ -86,6 +95,70 @@ def alreadyExist(ID):
 	#print X.explain()
 	return X.count()>0
 	
+	
+def processFriends(friends):
+
+	data = []
+	if not'data' in friends:
+		return data
+		
+	data = friends['data']
+	count = len(friends['data'])
+
+	if 'paging' in friends:
+		if 'next' in friends['paging']:
+			url = friends['paging']['next']
+			resp = urllib.urlopen(url).read()
+			resp = json.loads(resp)
+			data = data + processFriends(resp)
+
+	return data
+	
+def saveFanInfo(ID):
+	global day
+
+	fan_path = ID + "?fields=id,name,fan_count"
+	print "FanPath:"
+	print fan_path
+	params = urllib.urlencode({"access_token": ACCESS_TOKEN})
+	host = "https://graph.facebook.com/v2.8/"
+
+	url = "{host}{path}&{params}".format(host=host, path=fan_path, params=params)
+	try:
+		
+		
+		try:
+			info = urllib.urlopen(url).read()
+			info = json.loads(info)
+		except:
+			fan_path = ID + "?fields=id,name,friends{id,name}"
+			url = "{host}{path}&{params}".format(host=host, path=fan_path, params=params)
+			info = urllib.urlopen(url).read()
+			info = json.loads(info)
+
+			all_friends = []
+			if 'friends' in info:
+				print "Friends processing"
+				all_friends	= processFriends(info['friends'])
+			info['friends'] = all_friends		# add the list of friends in the case of profile page
+			info['fan_count'] = len(all_friends)
+
+			
+
+		if 'fan_count' in info:
+			info['day'] = day		# day of analysis (progressive int)
+			id = info['id']
+			print(info)
+			print "Saving fan count information..."
+			insertResult = db.dailyPageInfo.insert(info)
+
+	except:
+			print "ERROR during page info request"
+			id = -2
+	return id
+	
+
+
 def processResponse(pageId,res):
 	global global_buffer
 	global day
@@ -113,15 +186,17 @@ def processResponse(pageId,res):
 		if 'picture' in post:
 			pic_url			=	post['picture']
 
+		all_comments = []
 		if 'comments' in post:
 			print "Comments processing"
 			all_comments	=	processComments(post['comments'])
-			post['comments'] = all_comments
+		post['comments'] = all_comments
 	
+		all_reactions = []
 		if 'reactions' in post:
 			print "Reactions processing"
 			all_reactions	=	processReactions(post['reactions']) 
-			post['reactions'] = all_reactions
+		post['reactions'] = all_reactions
 
 	#	if 'updated_time' in post:
 	#		updated_time		=	post['updated_time']
@@ -184,6 +259,35 @@ def processResponse(pageId,res):
 #global ALTERNATIVE_TOKEN
 #ALTERNATIVE_TOKEN = '???'
 
+
+# Useful for debugging
+def FAKE_getPagePosts(ID):
+	ID = str(ID)
+
+#Save the number of fans at the moment of crawling
+	fan_path = ID + "?fields=id,name,fan_count"
+	print "FanPath:"
+	print fan_path
+	#print "\n"
+	params = urllib.urlencode({"access_token": ACCESS_TOKEN})
+
+	url = "{host}{path}&{params}".format(host=host, path=path, params=params)
+	try:
+		resp = urllib.urlopen(url).read()
+		if 'data' in resp:
+			if 'fan_count' in resp['data']:
+				info = resp['data']
+				info['day'] = day		# day of analysis (progressive int)
+				id = info['id']
+				print "Saving fan count information..."
+				pprint.pprint(info)
+				insertResult = db.pageInfoDaily.insert(info)
+
+	except:
+			print "ERROR during page info request"
+
+	return id
+
 def getPagePosts(ID):
 
 	ID = str(ID)
@@ -225,7 +329,7 @@ def getPagePosts(ID):
 		return ERR_NO_RESPONSE
 
 
-		
+			
 	# convert the returned JSON string to a Python datatype 
 	respObj = json.loads(resp)
 #	respObj = respObj['data']	# keep the response data (list of posts)
@@ -237,6 +341,10 @@ def getPagePosts(ID):
 			if 'id' in respObj['data']:
 				if len(id = respObj['data'][0]['id'].split('_'))>0:
 					id = respObj['data'][0]['id'].split('_')[0]
+
+	#Save the number of fans at the moment of crawling
+	id = saveFanInfo(ID)
+
 	return id
 
 
@@ -273,7 +381,10 @@ global_buffer = []
 # 1485475200	27 Jan 2017 00:00:00 (12 am UCT)
 until = time.time()
 until =      int(until)  # Midnight at the day of the script run
-since =	1485388800  # Thu, 26 Jan 2017 00:00:00 (12 am UCT)
+#until = 1486598400
+
+since =	1485388800  # Thu, 26 Jan 2017 00:00:00 (12 am Europe/London)
+since = 	1485385200  # Thu, 26 Jan 2017 00:00:00 (12 am Europe/Zurich)
 
 print "Crawling posts since:\t" + datetime.datetime.fromtimestamp(since).strftime(date_format)
 print "Crawling posts until:\t" + datetime.datetime.fromtimestamp(until).strftime(date_format)
@@ -295,6 +406,7 @@ if r<0:
 	sys.exit(r)
 	
 print "Behaviour Analysis:\tProcessed\t"+str(tot_posts)+ "\tposts for the user\t"+str(r)
+print "(2 if the response is empty)"
 
 
 
